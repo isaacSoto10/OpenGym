@@ -16,7 +16,9 @@ ARG VITE_SOURCE_URL="https://github.com/isaacSoto10/OpenGym"
 ENV VITE_IMG_BASE=${VITE_IMG_BASE}
 ENV VITE_GIF_BASE=${VITE_GIF_BASE}
 ENV VITE_SOURCE_URL=${VITE_SOURCE_URL}
-RUN npm run build
+# Railway serves the PWA from the domain root. Root-absolute assets keep nested SPA routes
+# reloadable while the default/mobile build retains vite.config.js's relative base.
+RUN npm run build -- --base=/
 
 FROM node:22-alpine AS api-dependencies
 
