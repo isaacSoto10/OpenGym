@@ -10,6 +10,7 @@ data/
 
 # Build output / deps
 frontend/dist/
+.release-artifacts/
 node_modules/
 *.log
 .DS_Store

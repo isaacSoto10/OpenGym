@@ -1,0 +1,99 @@
+# Railway terminates TLS and overwrites the original request metadata before it reaches this
+# listener. Forward those authoritative values to the private API instead of replacing them with
+# the address of Railway's edge proxy.
+user nginx;
+worker_processes auto;
+pid /run/nginx/nginx.pid;
+error_log /dev/stderr warn;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    log_format railway '$original_client_ip - $host "$request" $status $body_bytes_sent '
+                       'request_id=$http_x_railway_request_id edge=$http_x_railway_edge';
+    access_log /dev/stdout railway;
+
+    sendfile on;
+    keepalive_timeout 65;
+    server_tokens off;
+
+    map $http_x_real_ip $original_client_ip {
+        default $http_x_real_ip;
+        ""      $remote_addr;
+    }
+
+    map $http_x_forwarded_proto $original_proto {
+        default $http_x_forwarded_proto;
+        ""      $scheme;
+    }
+
+    map $http_x_forwarded_host $original_host {
+        default $http_x_forwarded_host;
+        ""      $host;
+    }
+
+    limit_req_zone $original_client_ip zone=opengym_api:10m rate=20r/s;
+    limit_req_status 429;
+
+    server {
+        listen 0.0.0.0:${PORT};
+        server_name _;
+
+        root /usr/share/nginx/html;
+        index index.html;
+        client_max_body_size 6m;
+
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header Permissions-Policy "camera=(), geolocation=(), microphone=()" always;
+
+        # Keep the API on the same public origin as the PWA, which WebAuthn requires.
+        location ^~ /api/ {
+            limit_req zone=opengym_api burst=40 nodelay;
+
+            proxy_pass http://127.0.0.1:${API_PORT};
+            proxy_http_version 1.1;
+            proxy_connect_timeout 5s;
+            proxy_read_timeout 60s;
+            proxy_send_timeout 60s;
+
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-Host $original_host;
+            proxy_set_header X-Forwarded-Proto $original_proto;
+            proxy_set_header X-Real-IP $original_client_ip;
+            proxy_set_header X-Forwarded-For $original_client_ip;
+            # Do not let an arbitrary client outrank Railway's trusted address in api/server.js.
+            proxy_set_header CF-Connecting-IP "";
+            proxy_set_header Connection "";
+        }
+
+        # The app shell must revalidate so a Railway deploy is visible without a hard refresh.
+        location ~* \.(?:css|html|js|json)$ {
+            expires -1;
+            try_files $uri =404;
+        }
+
+        # Icons and bundled visual assets are content-addressed by the build and can be cached.
+        location ~* \.(?:avif|gif|ico|jpe?g|png|svg|webp|woff2?)$ {
+            expires 30d;
+            try_files $uri =404;
+        }
+
+        # React Router handles every remaining application route.
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+
+        gzip on;
+        gzip_types application/javascript application/json image/svg+xml text/css text/plain;
+        gzip_vary on;
+        gzip_min_length 1024;
+    }
+}

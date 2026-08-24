@@ -3,6 +3,9 @@
 openGym is two small containers (a web server and an API) plus a folder of your data.
 This guide takes you from "just cloned it" to "using it from my phone over the internet".
 
+For a hosted one-service deployment with a persistent volume, see
+**[Railway: one-service self-hosting](RAILWAY.md)**.
+
 ## 1. Run it locally (5 minutes)
 
 Requirements: [Docker](https://docs.docker.com/get-docker/) with the Compose plugin.
