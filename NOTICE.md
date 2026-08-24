@@ -12,6 +12,9 @@ with the AGPL, provided the corresponding source code remains available under th
 the project repository. This permission applies to the distribution channel only and does
 not otherwise limit the license.
 
+Modifications © 2026 Isaac Soto. Isaac Soto grants the same App Store exception above for
+those modifications.
+
 ## Body diagram geometry
 
 The muscle outlines the body maps are drawn from (`frontend/src/lib/body-paths.js`) are derived
